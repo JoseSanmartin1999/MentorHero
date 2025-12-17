@@ -2,6 +2,7 @@
 
 const { pool } = require('../db'); 
 const bcrypt = require('bcryptjs');
+const generateToken = require('../utils/generateToken');
 
 // --- Función Auxiliar para la Validación de Edad ---
 const calculateAge = (dateOfBirth) => {
@@ -74,7 +75,7 @@ const registerUser = async (req, res) => {
     }
 
     // Rol (Valores permitidos)
-    const allowedRoles = ['Aprendiz', 'Tutor', 'Administrador'];
+    const allowedRoles = ['Aprendiz', 'Tutor'];
     if (!allowedRoles.includes(rol)) {
         return res.status(400).json({ message: `El rol debe ser uno de: ${allowedRoles.join(', ')}.` });
     }
@@ -142,6 +143,54 @@ const registerUser = async (req, res) => {
     }
 };
 
+const loginUser = async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ message: 'El nombre de usuario y la contraseña son obligatorios.' });
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+
+        // 1. Buscar el usuario por username
+        const [users] = await connection.execute(
+            'SELECT user_id, username, password_hash, rol FROM users WHERE username = ?',
+            [username]
+        );
+
+        const user = users[0];
+
+        // 2. Verificar si el usuario existe y si la contraseña es correcta
+        if (user && (await bcrypt.compare(password, user.password_hash))) {
+            
+            // 3. Generar el Token JWT
+            const token = generateToken(user.user_id, user.username, user.rol);
+            
+            // 4. Respuesta exitosa
+            res.json({
+                user_id: user.user_id,
+                username: user.username,
+                rol: user.rol,
+                token: token, // <-- Enviar el token al cliente
+                message: 'Inicio de sesión exitoso.'
+            });
+
+        } else {
+            // Usuario no encontrado o contraseña incorrecta
+            res.status(401).json({ message: 'Credenciales inválidas (usuario o contraseña incorrectos).' });
+        }
+
+    } catch (error) {
+        console.error('Error durante el inicio de sesión en MySQL:', error);
+        res.status(500).json({ message: 'Error del servidor durante el inicio de sesión.' });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
 module.exports = {
-    registerUser
+    registerUser,
+    loginUser // <-- Exportar la nueva función
 };

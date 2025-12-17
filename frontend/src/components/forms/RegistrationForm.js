@@ -1,15 +1,19 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-// --- MOCK DATA --- (Reemplazar con llamada a la API en producción)
+// --- MOCK DATA --- 
+// En una aplicación real, esta lista de carreras se cargaría desde el backend.
 const mockCarreras = [
     { id: 1, name: 'Ingeniería de Software' },
     { id: 2, name: 'Marketing Digital' },
     { id: 3, name: 'Diseño Gráfico' },
     { id: 4, name: 'Administración de Empresas' },
 ];
-const roles = ['Aprendiz', 'Tutor', 'Administrador'];
-const BACKEND_URL = 'http://localhost:5000/api/auth/register'; // URL de tu backend
+
+// 🛑 SEGURIDAD: Solo permitimos que el usuario elija entre Aprendiz y Tutor.
+const roles = ['Aprendiz', 'Tutor']; 
+const BACKEND_URL = 'http://localhost:5000/api/auth/register'; 
 
 const RegistrationForm = () => {
     // 1. ESTADO DEL FORMULARIO
@@ -22,13 +26,14 @@ const RegistrationForm = () => {
         carrera_id: mockCarreras[0].id,
         institucion: '',
         semestre: '1',
-        rol: 'Aprendiz',
+        rol: 'Aprendiz', // Valor predeterminado
     });
     const [file, setFile] = useState(null);
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [responseMessage, setResponseMessage] = useState({ type: '', text: '' });
 
+    // Genera la lista de semestres (1 a 8)
     const semesters = useMemo(() => Array.from({ length: 8 }, (_, i) => String(i + 1)), []);
 
     // 2. MANEJO DE CAMBIOS
@@ -51,9 +56,9 @@ const RegistrationForm = () => {
     // 3. VALIDACIÓN EN EL CLIENTE
     const validate = () => {
         const newErrors = {};
-        const { nombre, fecha_nacimiento, username, password, repetir_password, institucion } = formData;
+        const { password, repetir_password, fecha_nacimiento } = formData;
 
-        // Validación de campos obligatorios (simplificado)
+        // Validación de campos obligatorios (simple)
         Object.keys(formData).forEach(key => {
             if (!formData[key]) {
                 newErrors[key] = 'Este campo es obligatorio.';
@@ -72,7 +77,6 @@ const RegistrationForm = () => {
         if (fecha_nacimiento) {
             const dob = new Date(fecha_nacimiento);
             const today = new Date();
-            // Calcular fecha mínima: 17 años antes de hoy
             const minDate = new Date(today.getFullYear() - 17, today.getMonth(), today.getDate());
             if (dob > minDate) {
                 newErrors.fecha_nacimiento = 'Debe tener al menos 17 años.';
@@ -96,13 +100,13 @@ const RegistrationForm = () => {
         setIsSubmitting(true);
         setResponseMessage({ type: '', text: '' });
         
-        // Usar FormData para enviar archivos y datos de texto
+        // Usar FormData para enviar archivos (foto) y datos de texto
         const dataToSend = new FormData();
         Object.keys(formData).forEach(key => {
             dataToSend.append(key, formData[key]);
         });
         
-        // Adjuntar el archivo, usando el nombre de campo 'foto'
+        // Adjuntar el archivo, usando el nombre de campo 'foto' (esperado por Multer/Cloudinary)
         if (file) {
             dataToSend.append('foto', file); 
         }
@@ -110,7 +114,7 @@ const RegistrationForm = () => {
         try {
             const response = await fetch(BACKEND_URL, {
                 method: 'POST',
-                body: dataToSend,
+                body: dataToSend, // ¡No se necesita 'Content-Type' con FormData!
             });
 
             const data = await response.json();
@@ -118,11 +122,12 @@ const RegistrationForm = () => {
             if (response.ok) {
                 setResponseMessage({ 
                     type: 'success', 
-                    text: `¡Registro exitoso! Usuario: ${data.username}. Rol: ${data.rol}.`
+                    text: `¡Registro exitoso! Usuario: ${data.username}. Ahora puedes iniciar sesión.`
                 });
-                // Opcional: limpiar formulario (setFormData a valores iniciales)
+                // Opcional: limpiar formulario o redirigir
+                // navigate('/login');
             } else {
-                // El error viene del backend (ej: usuario ya existe)
+                // El error viene del backend (ej: usuario ya existe, rol inválido, etc.)
                 setResponseMessage({ 
                     type: 'danger', 
                     text: data.message || 'Error desconocido en el registro.' 
@@ -258,7 +263,6 @@ const RegistrationForm = () => {
                                             disabled={isSubmitting}
                                         >
                                             {mockCarreras.map(carrera => (
-                                                // Nota: el valor del option debe ser el ID (numérico)
                                                 <option key={carrera.id} value={carrera.id}>
                                                     {carrera.name}
                                                 </option>
@@ -303,7 +307,7 @@ const RegistrationForm = () => {
                                         {errors.foto && <div className="invalid-feedback">{errors.foto}</div>}
                                     </div>
 
-                                    {/* Campo Rol (Radios) */}
+                                    {/* Campo Rol (Radios) 🛑 Solo muestra Aprendiz y Tutor */}
                                     <div className="col-12 mt-4">
                                         <label className="form-label d-block">Selecciona tu Rol:</label>
                                         <div className="d-flex gap-3">
@@ -347,6 +351,9 @@ const RegistrationForm = () => {
                                     </div>
                                 </div>
                             </form>
+                        </div>
+                        <div className="card-footer text-muted text-center">
+                            ¿Ya tienes una cuenta? <Link to="/login">Inicia Sesión aquí</Link>
                         </div>
                     </div>
                 </div>

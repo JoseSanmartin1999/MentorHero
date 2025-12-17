@@ -1,22 +1,17 @@
-// backend/routes/authRoutes.js
+// backend/routes/authRoutes.js (MODIFICADO)
 
 const express = require('express');
-const { registerUser } = require('../controllers/authController');
-// Importar el middleware de Multer configurado con Cloudinary
+// Importar loginUser
+const { registerUser, loginUser } = require('../controllers/authController'); 
 const upload = require('../config/cloudinaryConfig'); 
 const router = express.Router();
 
-// Ruta para el registro de usuarios
+// Ruta para el registro (con middleware de foto)
 // POST /api/auth/register
+router.post('/register', upload.single('foto'), registerUser);
 
-/*
- * upload.single('foto') es el middleware de Multer.
- * 1. Él intercepta la petición.
- * 2. Procesa el campo de archivo llamado 'foto'.
- * 3. Sube ese archivo a Cloudinary.
- * 4. Si es exitoso, agrega el objeto 'req.file' (con la URL de Cloudinary) a la petición.
- * 5. Llama a la siguiente función (registerUser).
- */
-router.post('/register', upload.single('foto'), registerUser); // <-- Middleware insertado
+// Ruta para el inicio de sesión
+// POST /api/auth/login
+router.post('/login', loginUser); // <-- NUEVA RUTA: No necesita middleware de archivo
 
 module.exports = router;
