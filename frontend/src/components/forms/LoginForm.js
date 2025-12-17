@@ -5,6 +5,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 const LOGIN_URL = 'http://localhost:5000/api/auth/login';
 
 const LoginForm = () => {
+    // ... (Estados sin cambios) ...
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -14,6 +15,8 @@ const LoginForm = () => {
     const [responseMessage, setResponseMessage] = useState({ type: '', text: '' });
     
     const navigate = useNavigate();
+
+    // ... (handleChange y validate sin cambios) ...
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -35,6 +38,7 @@ const LoginForm = () => {
         return Object.keys(newErrors).length === 0;
     };
 
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -50,7 +54,7 @@ const LoginForm = () => {
             const response = await fetch(LOGIN_URL, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json', // Importante para enviar JSON
+                    'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(formData), 
             });
@@ -71,19 +75,26 @@ const LoginForm = () => {
                     text: `¡Bienvenido, ${data.username}! Redirigiendo...` 
                 });
 
-                // Redirigir al dashboard (asumiendo que crearás esa ruta)
-                setTimeout(() => navigate('/dashboard'), 1500); 
+                // 🛑 MEJORA 1: Redirigir inmediatamente o reducir el timeout. 
+                // Si el backend es lento, un timeout largo empeora la UX.
+                setTimeout(() => navigate('/dashboard'), 500); // Reducción a 0.5s
 
             } else {
+                // 🛑 MEJORA 2: Manejo de error 401 (No autorizado) o 400 (Bad Request)
+                const errorText = response.status === 401 
+                    ? 'Usuario o contraseña incorrectos. Intenta de nuevo.'
+                    : data.message || 'Error al iniciar sesión.';
+                    
                 setResponseMessage({ 
                     type: 'danger', 
-                    text: data.message || 'Error al iniciar sesión. Verifica credenciales.' 
+                    text: errorText 
                 });
             }
 
         } catch (error) {
             console.error('Error de red o servidor:', error);
-            setResponseMessage({ type: 'danger', text: 'Error de conexión. Verifica que el backend esté activo.' });
+            // 🛑 Útil para depurar si el servidor está caído:
+            setResponseMessage({ type: 'danger', text: 'Error de conexión. Asegúrate que el Backend (puerto 5000) esté ACTIVO.' });
         } finally {
             setIsSubmitting(false);
         }
@@ -91,6 +102,7 @@ const LoginForm = () => {
 
     return (
         <div className="container my-5">
+            {/* ... (Todo el JSX se mantiene igual) ... */}
             <div className="row justify-content-center">
                 <div className="col-md-6">
                     <div className="card shadow-lg">

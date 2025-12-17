@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 // --- MOCK DATA --- 
-// En una aplicación real, esta lista de carreras se cargaría desde el backend.
+// 1. Carreras: (IDs deben coincidir con tu tabla 'carreras')
 const mockCarreras = [
     { id: 1, name: 'Ingeniería de Software' },
     { id: 2, name: 'Marketing Digital' },
@@ -11,11 +11,27 @@ const mockCarreras = [
     { id: 4, name: 'Administración de Empresas' },
 ];
 
-// 🛑 SEGURIDAD: Solo permitimos que el usuario elija entre Aprendiz y Tutor.
-const roles = ['Aprendiz', 'Tutor']; 
+// 2. Roles permitidos en el registro: (Excluimos Administrador)
+const roles = ['Aprendiz', 'Tutor'];
+
+// 3. Materias base para selección de Tutores: (IDs deben coincidir con tu tabla 'materias')
+const basicSubjects = [
+    { id: 1, name: 'Cálculo Diferencial e Integral' },
+    { id: 2, name: 'Fundamentos de Programación' },
+    { id: 3, name: 'Álgebra Lineal' },
+    { id: 4, name: 'Cálculo Vectorial' },
+    { id: 5, name: 'Estructura de Datos' },
+    { id: 6, name: 'Lógica' },
+    { id: 7, name: 'Programación Orientada a Objetos' },
+    { id: 8, name: 'Modelos Discretos' },
+    { id: 9, name: 'Programación Web' },
+    { id: 10, name: 'Métodos Numéricos' },
+];
+
 const BACKEND_URL = 'http://localhost:5000/api/auth/register'; 
 
 const RegistrationForm = () => {
+    
     // 1. ESTADO DEL FORMULARIO
     const [formData, setFormData] = useState({
         nombre: '',
@@ -26,60 +42,83 @@ const RegistrationForm = () => {
         carrera_id: mockCarreras[0].id,
         institucion: '',
         semestre: '1',
-        rol: 'Aprendiz', // Valor predeterminado
+        rol: 'Aprendiz',
     });
+    
     const [file, setFile] = useState(null);
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [responseMessage, setResponseMessage] = useState({ type: '', text: '' });
-
-    // Genera la lista de semestres (1 a 8)
+    const [selectedSubjects, setSelectedSubjects] = useState([]); // Array de IDs de materias
+    
     const semesters = useMemo(() => Array.from({ length: 8 }, (_, i) => String(i + 1)), []);
 
     // 2. MANEJO DE CAMBIOS
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        // Limpia el error al empezar a escribir
+        
+        // Lógica para limpiar las materias si cambia el rol a Aprendiz
+        if (name === 'rol' && value === 'Aprendiz') {
+            setSelectedSubjects([]);
+            setErrors(prev => ({ ...prev, subjects: undefined }));
+        }
+
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: undefined }));
         }
     };
+    
+    const handleFileChange = (e) => { 
+        setFile(e.target.files[0]); 
+        if (errors.foto) { setErrors(prev => ({ ...prev, foto: undefined })); }
+    };
 
-    const handleFileChange = (e) => {
-        setFile(e.target.files[0]);
-        if (errors.foto) {
-            setErrors(prev => ({ ...prev, foto: undefined }));
-        }
+    // Manejador de selección de materias para tutores
+    const handleSubjectChange = (subjectId) => {
+        const id = parseInt(subjectId);
+        setSelectedSubjects(prev => {
+            const isSelected = prev.includes(id);
+            const newSelection = isSelected 
+                ? prev.filter(s => s !== id) 
+                : [...prev, id];
+            
+            // Limpia el error de materias si ya se cumple el mínimo (3)
+            if (newSelection.length >= 3 && errors.subjects) {
+                 setErrors(prevErrors => ({ ...prevErrors, subjects: undefined }));
+            }
+            return newSelection;
+        });
     };
 
     // 3. VALIDACIÓN EN EL CLIENTE
     const validate = () => {
         const newErrors = {};
-        const { password, repetir_password, fecha_nacimiento } = formData;
-
-        // Validación de campos obligatorios (simple)
+        const { password, repetir_password, fecha_nacimiento, rol } = formData;
+        
+        // Validación de campos obligatorios (simplificado)
         Object.keys(formData).forEach(key => {
             if (!formData[key]) {
-                newErrors[key] = 'Este campo es obligatorio.';
+                 newErrors[key] = 'Este campo es obligatorio.';
             }
         });
-
+        
         // Contraseñas
-        if (password.length < 8) {
-            newErrors.password = 'Debe tener al menos 8 caracteres.';
-        }
-        if (password !== repetir_password) {
-            newErrors.repetir_password = 'Las contraseñas no coinciden.';
-        }
-
+        if (password.length < 8) { newErrors.password = 'Debe tener al menos 8 caracteres.'; }
+        if (password !== repetir_password) { newErrors.repetir_password = 'Las contraseñas no coinciden.'; }
+        
         // Validación de Edad (Mínimo 17 años)
         if (fecha_nacimiento) {
-            const dob = new Date(fecha_nacimiento);
-            const today = new Date();
-            const minDate = new Date(today.getFullYear() - 17, today.getMonth(), today.getDate());
-            if (dob > minDate) {
-                newErrors.fecha_nacimiento = 'Debe tener al menos 17 años.';
+             const dob = new Date(fecha_nacimiento);
+             const today = new Date();
+             const minDate = new Date(today.getFullYear() - 17, today.getMonth(), today.getDate());
+             if (dob > minDate) { newErrors.fecha_nacimiento = 'Debe tener al menos 17 años.'; }
+        }
+
+        // Validación del MÍNIMO DE MATERIAS PARA TUTOR
+        if (rol === 'Tutor') {
+            if (selectedSubjects.length < 3) {
+                newErrors.subjects = 'Como Tutor, debes seleccionar al menos 3 materias que domines.';
             }
         }
         
@@ -92,29 +131,38 @@ const RegistrationForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (!validate()) {
+        if (!validate()) { 
             setResponseMessage({ type: 'danger', text: 'Por favor, corrige los errores del formulario.' });
-            return;
+            return; 
         }
 
         setIsSubmitting(true);
         setResponseMessage({ type: '', text: '' });
         
-        // Usar FormData para enviar archivos (foto) y datos de texto
+        // Usar FormData para enviar archivos y datos de texto
         const dataToSend = new FormData();
+        
+        // Agregar datos de texto
         Object.keys(formData).forEach(key => {
             dataToSend.append(key, formData[key]);
         });
         
-        // Adjuntar el archivo, usando el nombre de campo 'foto' (esperado por Multer/Cloudinary)
-        if (file) {
-            dataToSend.append('foto', file); 
+        // ADJUNTAR MATERIAS CONDICIONALMENTE
+        if (formData.rol === 'Tutor' && selectedSubjects.length > 0) {
+            // Se envía como string JSON para que el backend lo pueda parsear
+            dataToSend.append('subjects', JSON.stringify(selectedSubjects)); 
+        } else if (formData.rol === 'Aprendiz') {
+            // Aseguramos que no se envíe la clave 'subjects' si es Aprendiz
+            dataToSend.delete('subjects');
         }
+
+        // Adjuntar foto
+        if (file) { dataToSend.append('foto', file); }
 
         try {
             const response = await fetch(BACKEND_URL, {
                 method: 'POST',
-                body: dataToSend, // ¡No se necesita 'Content-Type' con FormData!
+                body: dataToSend, 
             });
 
             const data = await response.json();
@@ -124,10 +172,7 @@ const RegistrationForm = () => {
                     type: 'success', 
                     text: `¡Registro exitoso! Usuario: ${data.username}. Ahora puedes iniciar sesión.`
                 });
-                // Opcional: limpiar formulario o redirigir
-                // navigate('/login');
             } else {
-                // El error viene del backend (ej: usuario ya existe, rol inválido, etc.)
                 setResponseMessage({ 
                     type: 'danger', 
                     text: data.message || 'Error desconocido en el registro.' 
@@ -307,7 +352,7 @@ const RegistrationForm = () => {
                                         {errors.foto && <div className="invalid-feedback">{errors.foto}</div>}
                                     </div>
 
-                                    {/* Campo Rol (Radios) 🛑 Solo muestra Aprendiz y Tutor */}
+                                    {/* Campo Rol (Radios) */}
                                     <div className="col-12 mt-4">
                                         <label className="form-label d-block">Selecciona tu Rol:</label>
                                         <div className="d-flex gap-3">
@@ -332,6 +377,34 @@ const RegistrationForm = () => {
                                         {errors.rol && <div className="text-danger mt-1" style={{fontSize: '0.875em'}}>{errors.rol}</div>}
                                     </div>
 
+                                    {/* SECCIÓN CONDICIONAL DE MATERIAS PARA TUTORES */}
+                                    {formData.rol === 'Tutor' && (
+                                        <div className="col-12 mt-4 border p-3 rounded bg-light">
+                                            <h5 className="mb-3 text-primary">Materias a Tutelar (Mínimo 3):</h5>
+                                            <div className="row">
+                                                {basicSubjects.map(subject => (
+                                                    <div className="col-md-6 col-lg-4" key={subject.id}>
+                                                        <div className="form-check">
+                                                            <input
+                                                                className="form-check-input"
+                                                                type="checkbox"
+                                                                value={subject.id}
+                                                                id={`subject-${subject.id}`}
+                                                                checked={selectedSubjects.includes(subject.id)}
+                                                                onChange={() => handleSubjectChange(subject.id)}
+                                                                disabled={isSubmitting}
+                                                            />
+                                                            <label className="form-check-label" htmlFor={`subject-${subject.id}`}>
+                                                                {subject.name}
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {errors.subjects && <div className="text-danger mt-2">{errors.subjects}</div>}
+                                        </div>
+                                    )}
+                                    
                                     {/* Botón de Envío */}
                                     <div className="col-12 mt-4 text-center">
                                         <button 

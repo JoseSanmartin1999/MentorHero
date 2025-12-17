@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Importar useNavigate para redirigir
+import { useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const PROTECTED_URL = 'http://localhost:5000/api/users/profile';
-const DEFAULT_AVATAR = 'https://res.cloudinary.com/dfuk35w6v/image/upload/v1700000000/default-avatar.png'; // URL de un avatar por defecto
+const DEFAULT_AVATAR = 'https://res.cloudinary.com/dfuk35w6v/image/upload/v1700000000/default-avatar.png'; 
 
-// Función para formatear la fecha
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    // Formato simple DD/MM/AAAA
     return date.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' });
 };
 
@@ -24,9 +22,10 @@ const DashboardPage = () => {
             const token = localStorage.getItem('userToken');
 
             if (!token) {
-                setError('No tienes sesión iniciada. Redirigiendo a Login...');
+                // 🛑 CORRECCIÓN 1: Redirección inmediata si no hay token
+                setError('No tienes sesión iniciada.');
                 setLoading(false);
-                setTimeout(() => navigate('/login'), 1500); // Redirigir si no hay token
+                navigate('/login');
                 return;
             }
 
@@ -44,8 +43,11 @@ const DashboardPage = () => {
                     setUserData(data.user);
                 } else {
                     const errorData = await response.json();
-                    setError(errorData.message || 'Error al cargar los datos del perfil.');
-                    setTimeout(() => navigate('/login'), 2000); // Redirigir ante error 401/403
+                    setError(errorData.message || 'Error al cargar los datos del perfil. Sesión caducada.');
+                    // Limpiar sesión y redirigir
+                    localStorage.removeItem('userToken');
+                    localStorage.removeItem('userInfo');
+                    navigate('/login'); // 🛑 CORRECCIÓN 2: Redirección sin timeout
                 }
             } catch (err) {
                 setError('Error de conexión con el servidor. El backend puede estar inactivo.');
@@ -57,7 +59,6 @@ const DashboardPage = () => {
         fetchProtectedData();
     }, [navigate]);
 
-    // Función de cierre de sesión
     const handleLogout = () => {
         localStorage.removeItem('userToken');
         localStorage.removeItem('userInfo');
@@ -72,10 +73,16 @@ const DashboardPage = () => {
         return <div className="alert alert-danger text-center my-5">{error}</div>;
     }
 
-    // Determinar la URL de la imagen
+    // Asegurarse de que los datos existen antes de intentar renderizar
+    if (!userData) {
+        return <div className="alert alert-warning text-center my-5">No se pudo obtener la información del usuario. Intenta iniciar sesión de nuevo.</div>;
+    }
+    
     const avatarUrl = userData.foto_perfil_url ? userData.foto_perfil_url : DEFAULT_AVATAR;
+    const isTutor = userData.rol === 'Tutor';
+    // 🛑 Manejo defensivo: Si el backend no envía el array, asumimos que es vacío.
+    const materiasTutor = userData.materias_a_enseñar || []; 
 
-    // Renderizado del Dashboard
     return (
         <div className="container my-5">
             <div className="row justify-content-center">
@@ -96,15 +103,16 @@ const DashboardPage = () => {
                                     style={{ width: '150px', height: '150px', objectFit: 'cover' }}
                                 />
                                 <h3 className="mt-3 mb-0">{userData.username}</h3>
-                                <span className={`badge bg-${userData.rol === 'Tutor' ? 'info' : 'secondary'} text-white`}>
+                                <span className={`badge bg-${isTutor ? 'info' : 'secondary'} text-white`}>
                                     {userData.rol}
                                 </span>
                             </div>
 
                             <hr />
 
+                            {/* SECCIÓN DE DETALLES PRINCIPALES */}
                             <h5 className="mb-3 text-muted">Detalles del Perfil:</h5>
-                            <ul className="list-group list-group-flush">
+                            <ul className="list-group list-group-flush mb-4">
                                 <li className="list-group-item d-flex justify-content-between align-items-center">
                                     <strong>Nombre Completo:</strong>
                                     <span>{userData.nombre}</span>
@@ -121,12 +129,28 @@ const DashboardPage = () => {
                                     <strong>Semestre:</strong>
                                     <span>{userData.semestre}</span>
                                 </li>
-                                {/* Aquí podrías añadir la carrera con una consulta extra si lo deseas */}
-                                <li className="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>ID de Carrera:</strong>
-                                    <span>{userData.carrera_id}</span>
-                                </li>
                             </ul>
+                            
+                            {/* 🛑 SECCIÓN DE MATERIAS DEL TUTOR (CONDICIONAL) */}
+                            {isTutor && materiasTutor.length > 0 && (
+                                <div className="mt-4 p-3 border rounded bg-light">
+                                    <h5 className="text-primary mb-3">Materias que puedes enseñar:</h5>
+                                    <ul className="list-group">
+                                        {/* Usamos el ID de la materia como key para mayor estabilidad */}
+                                        {materiasTutor.map((materia) => (
+                                            <li key={materia.materia_id} className="list-group-item list-group-item-action">
+                                                {materia.nombre_materia}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {isTutor && materiasTutor.length === 0 && (
+                                <div className="alert alert-info text-center mt-4">
+                                    Aún no tienes materias registradas para tutoría.
+                                </div>
+                            )}
                             
                             <div className="text-center mt-5">
                                 <button 
