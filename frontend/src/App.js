@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import 'bootstrap/dist/css/bootstrap.min.css'; // Importa los estilos de Bootstrap
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 // ===========================================
 // 1. IMPORTACIONES DE COMPONENTES DE LAYOUT Y PÁGINAS
@@ -12,34 +12,33 @@ import Footer from './components/Footer';
 import RegistrationPage from './pages/RegistrationPage';
 import LoginPage from './pages/LoginPage'; 
 
-// Páginas Protegidas
+// Páginas Protegidas y de Funcionalidad
 import DashboardPage from './pages/DashboardPage'; 
+import SearchTutorPage from './pages/SearchTutorPage'; 
+import TutorProfilePage from './pages/TutorProfilePage'; 
+import SolicitudTutoriaPage from './pages/SolicitudTutoriaPage'; 
+import TutoriasPage from './pages/TutoriasPage'; 
+
+// 🛑 NUEVA IMPORTACIÓN: Página para que el aprendiz vea sus solicitudes enviadas
+import MisTutoriasAprendiz from './pages/MisTutoriasAprendiz'; 
+
+// Componentes placeholder restantes
+const LogrosPage = () => <h1 className="text-center my-5 text-warning">Página de Logros (En desarrollo)</h1>; 
+
 // ===========================================
 
 function App() {
   return (
-    // <Router> envuelve toda la aplicación para habilitar la navegación
     <Router>
-      
-      {/* Navbar: Visible en todas las rutas */}
       <Navbar /> 
       
-      <main className="container-fluid py-4">
-        {/* <Routes> define las reglas de mapeo de URL a Componentes */}
+      <main className="container py-4" style={{ minHeight: '80vh' }}>
         <Routes>
-          
-          {/* ------------------------------------- */}
-          {/* RUTAS PÚBLICAS Y DE AUTENTICACIÓN */}
-          {/* ------------------------------------- */}
-          
-          {/* Ruta principal (Root: /) */}
-          <Route 
-            path="/" 
-            element={
+          {/* RUTAS PÚBLICAS */}
+          <Route path="/" element={
               <div className="text-center my-5">
                 <h1>Bienvenido a MentorHero</h1>
                 <p className="lead">Tu plataforma de mentoría entre pares.</p>
-                
                 <div className="mt-4">
                   <Link to="/register" className="btn btn-primary btn-lg">Registrarse ahora</Link>
                   <Link to="/login" className="btn btn-outline-secondary btn-lg ms-3">Iniciar Sesión</Link>
@@ -47,33 +46,28 @@ function App() {
               </div>
             } 
           />
-          
-          {/* Ruta de Registro */}
           <Route path="/register" element={<RegistrationPage />} />
-          
-          {/* Ruta de Login */}
           <Route path="/login" element={<LoginPage />} />
           
-          {/* ------------------------------------- */}
-          {/* RUTAS PROTEGIDAS (ACCESO RESTRINGIDO) */}
-          {/* ------------------------------------- */}
-          
-          {/* Ruta del Dashboard: Solo visible con Token JWT válido */}
+          {/* RUTAS PROTEGIDAS */}
           <Route path="/dashboard" element={<DashboardPage />} /> 
+          <Route path="/profile/:id" element={<TutorProfilePage />} /> 
+          <Route path="/solicitar-tutoria/:tutorId" element={<SolicitudTutoriaPage />} /> 
+          <Route path="/buscar-tutor" element={<SearchTutorPage />} /> 
 
-          {/* ------------------------------------- */}
-          {/* MANEJO DE ERRORES */}
-          {/* ------------------------------------- */}
-          
-          {/* Manejo de 404 (Cualquier ruta no definida) */}
+          {/* RUTA PARA EL TUTOR: Ver solicitudes recibidas (Bandeja de entrada) */}
+          <Route path="/tutorias" element={<TutoriasPage />} /> 
+
+          {/* 🛑 RUTA PARA EL APRENDIZ: Ver estado de sus solicitudes enviadas */}
+          <Route path="/mis-tutorias" element={<MisTutoriasAprendiz />} />
+
+          <Route path="/logros" element={<LogrosPage />} /> 
+
           <Route path="*" element={<h1 className="text-danger text-center">404: Página no encontrada</h1>} />
-          
         </Routes>
       </main>
 
-      {/* Footer: Visible en todas las rutas */}
       <Footer /> 
-      
     </Router>
   );
 }

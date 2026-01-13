@@ -1,23 +1,20 @@
 const express = require('express');
 const router = express.Router();
-// 🛑 Se agregaron 'getSolicitudesTutor' y 'actualizarStatus' a la importación
+// 🛑 IMPORTANTE: Incluir las 4 funciones en la desestructuración
 const { 
     crearSolicitud, 
     getSolicitudesTutor, 
-    actualizarStatus 
+    actualizarStatus,
+    getSolicitudesAprendiz 
 } = require('../controllers/solicitudController');
 const { protect } = require('../middleware/authMiddleware');
 
-// --- Rutas para el Aprendiz ---
-// Ruta para enviar una nueva solicitud
+// Rutas para el Aprendiz
 router.post('/crear', protect, crearSolicitud);
+router.get('/aprendiz', protect, getSolicitudesAprendiz);
 
-// --- Rutas para el Tutor ---
-// Ruta para que el tutor vea sus solicitudes recibidas
+// Rutas para el Tutor
 router.get('/tutor', protect, getSolicitudesTutor);
-
-// Ruta para que el tutor acepte o rechace una solicitud específica
 router.patch('/actualizar/:id', protect, actualizarStatus);
 
-router.get('/aprendiz', protect, getSolicitudesAprendiz);
 module.exports = router;

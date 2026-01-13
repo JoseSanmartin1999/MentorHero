@@ -1,0 +1,6 @@
+projectKey=Aseguramiento
+serverUrl=http://localhost:9000
+serverVersion=26.1.0.118079
+dashboardUrl=http://localhost:9000/dashboard?id=Aseguramiento
+ceTaskId=35260406-06dd-4855-8b6a-32fa98038d24
+ceTaskUrl=http://localhost:9000/api/ce/task?id=35260406-06dd-4855-8b6a-32fa98038d24

@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const PROTECTED_URL = 'http://localhost:5000/api/users/profile';
-const DEFAULT_AVATAR = 'https://res.cloudinary.com/dfuk35w6v/image/upload/v1700000000/default-avatar.png'; 
+const DEFAULT_AVATAR = 'https://res.cloudinary.com/dfuk35w6v/image/upload/v1700000000/default-avatar.png';
 
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
 };
 
 const DashboardPage = () => {
@@ -20,11 +20,7 @@ const DashboardPage = () => {
     useEffect(() => {
         const fetchProtectedData = async () => {
             const token = localStorage.getItem('userToken');
-
             if (!token) {
-                // 🛑 CORRECCIÓN 1: Redirección inmediata si no hay token
-                setError('No tienes sesión iniciada.');
-                setLoading(false);
                 navigate('/login');
                 return;
             }
@@ -42,20 +38,15 @@ const DashboardPage = () => {
                     const data = await response.json();
                     setUserData(data.user);
                 } else {
-                    const errorData = await response.json();
-                    setError(errorData.message || 'Error al cargar los datos del perfil. Sesión caducada.');
-                    // Limpiar sesión y redirigir
                     localStorage.removeItem('userToken');
-                    localStorage.removeItem('userInfo');
-                    navigate('/login'); // 🛑 CORRECCIÓN 2: Redirección sin timeout
+                    navigate('/login');
                 }
             } catch (err) {
-                setError('Error de conexión con el servidor. El backend puede estar inactivo.');
+                setError('Error de conexión con el servidor.');
             } finally {
                 setLoading(false);
             }
         };
-
         fetchProtectedData();
     }, [navigate]);
 
@@ -65,100 +56,110 @@ const DashboardPage = () => {
         navigate('/login');
     };
 
-    if (loading) {
-        return <div className="text-center my-5"><span className="spinner-border text-success" role="status"></span> Cargando perfil...</div>;
-    }
+    if (loading) return (
+        <div className="d-flex justify-content-center align-items-center vh-100">
+            <div className="text-center">
+                <div className="spinner-grow text-primary" role="status"></div>
+                <p className="mt-2 fw-bold text-muted">Preparando tu espacio...</p>
+            </div>
+        </div>
+    );
 
-    if (error) {
-        return <div className="alert alert-danger text-center my-5">{error}</div>;
-    }
+    if (error) return <div className="alert alert-danger m-5 shadow-sm text-center">{error}</div>;
 
-    // Asegurarse de que los datos existen antes de intentar renderizar
-    if (!userData) {
-        return <div className="alert alert-warning text-center my-5">No se pudo obtener la información del usuario. Intenta iniciar sesión de nuevo.</div>;
-    }
-    
-    const avatarUrl = userData.foto_perfil_url ? userData.foto_perfil_url : DEFAULT_AVATAR;
-    const isTutor = userData.rol === 'Tutor';
-    // 🛑 Manejo defensivo: Si el backend no envía el array, asumimos que es vacío.
-    const materiasTutor = userData.materias_a_enseñar || []; 
+    const avatarUrl = userData?.foto_perfil_url || DEFAULT_AVATAR;
+    const isTutor = userData?.rol === 'Tutor';
+    const materiasTutor = userData?.materias_a_enseñar || [];
 
     return (
-        <div className="container my-5">
-            <div className="row justify-content-center">
-                <div className="col-lg-8">
-                    <div className="card shadow-lg border-0">
-                        
-                        <div className="card-header bg-success text-white text-center py-3">
-                            <h2>Bienvenido, {userData.nombre}</h2>
+        <div className="container-fluid py-5 bg-light" style={{ minHeight: '100vh' }}>
+            <div className="container">
+                <div className="row justify-content-center">
+                    <div className="col-lg-10">
+                        {/* Header / Banner Profile */}
+                        <div className="card border-0 shadow-sm overflow-hidden mb-4">
+                            <div className="bg-primary" style={{ height: '150px', background: 'linear-gradient(45deg, #1e3c72 0%, #2a5298 100%)' }}></div>
+                            <div className="card-body pt-0 px-4 pb-4">
+                                <div className="d-flex align-items-end mb-3" style={{ marginTop: '-75px' }}>
+                                    <div className="position-relative">
+                                        <img 
+                                            src={avatarUrl} 
+                                            alt="Perfil" 
+                                            className="rounded-circle border border-4 border-white shadow"
+                                            style={{ width: '150px', height: '150px', objectFit: 'cover', backgroundColor: 'white' }}
+                                        />
+                                        <span className={`position-absolute bottom-0 end-0 p-2 border border-2 border-white rounded-circle shadow-sm ${isTutor ? 'bg-info' : 'bg-success'}`} title={userData.rol}></span>
+                                    </div>
+                                    <div className="ms-4 mb-2">
+                                        <h2 className="fw-bold mb-0">{userData.nombre}</h2>
+                                        <p className="text-muted mb-0">@{userData.username} • <span className="badge bg-light text-dark border">{userData.rol}</span></p>
+                                    </div>
+                                    <div className="ms-auto mb-2">
+                                        <button onClick={handleLogout} className="btn btn-outline-danger btn-sm rounded-pill px-4">
+                                            <i className="bi bi-box-arrow-right me-2"></i>Cerrar Sesión
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        
-                        <div className="card-body p-5">
-                            <div className="text-center mb-4">
-                                {/* Imagen de Perfil */}
-                                <img 
-                                    src={avatarUrl} 
-                                    alt="Foto de Perfil" 
-                                    className="rounded-circle border border-5 border-light"
-                                    style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                                />
-                                <h3 className="mt-3 mb-0">{userData.username}</h3>
-                                <span className={`badge bg-${isTutor ? 'info' : 'secondary'} text-white`}>
-                                    {userData.rol}
-                                </span>
+
+                        <div className="row">
+                            {/* Left Column: Personal Info */}
+                            <div className="col-md-5">
+                                <div className="card border-0 shadow-sm mb-4">
+                                    <div className="card-body">
+                                        <h5 className="card-title fw-bold mb-4"><i className="bi bi-person-vcard me-2 text-primary"></i>Información Personal</h5>
+                                        <div className="mb-3">
+                                            <label className="small text-uppercase text-muted fw-bold">Institución</label>
+                                            <p className="mb-0 fw-semibold">{userData.institucion || 'No especificada'}</p>
+                                        </div>
+                                        <div className="mb-3">
+                                            <label className="small text-uppercase text-muted fw-bold">Semestre / Nivel</label>
+                                            <p className="mb-0 fw-semibold">{userData.semestre}° Semestre</p>
+                                        </div>
+                                        <div className="mb-3">
+                                            <label className="small text-uppercase text-muted fw-bold">Fecha de Nacimiento</label>
+                                            <p className="mb-0 fw-semibold">{formatDate(userData.fecha_nacimiento)}</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <hr />
-
-                            {/* SECCIÓN DE DETALLES PRINCIPALES */}
-                            <h5 className="mb-3 text-muted">Detalles del Perfil:</h5>
-                            <ul className="list-group list-group-flush mb-4">
-                                <li className="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>Nombre Completo:</strong>
-                                    <span>{userData.nombre}</span>
-                                </li>
-                                <li className="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>Fecha de Nacimiento:</strong>
-                                    <span>{formatDate(userData.fecha_nacimiento)}</span>
-                                </li>
-                                <li className="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>Institución:</strong>
-                                    <span>{userData.institucion}</span>
-                                </li>
-                                <li className="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>Semestre:</strong>
-                                    <span>{userData.semestre}</span>
-                                </li>
-                            </ul>
-                            
-                            {/* 🛑 SECCIÓN DE MATERIAS DEL TUTOR (CONDICIONAL) */}
-                            {isTutor && materiasTutor.length > 0 && (
-                                <div className="mt-4 p-3 border rounded bg-light">
-                                    <h5 className="text-primary mb-3">Materias que puedes enseñar:</h5>
-                                    <ul className="list-group">
-                                        {/* Usamos el ID de la materia como key para mayor estabilidad */}
-                                        {materiasTutor.map((materia) => (
-                                            <li key={materia.materia_id} className="list-group-item list-group-item-action">
-                                                {materia.nombre_materia}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {isTutor && materiasTutor.length === 0 && (
-                                <div className="alert alert-info text-center mt-4">
-                                    Aún no tienes materias registradas para tutoría.
-                                </div>
-                            )}
-                            
-                            <div className="text-center mt-5">
-                                <button 
-                                    className="btn btn-danger btn-lg" 
-                                    onClick={handleLogout}
-                                >
-                                    Cerrar Sesión
-                                </button>
+                            {/* Right Column: Specialization / Actions */}
+                            <div className="col-md-7">
+                                {isTutor ? (
+                                    <div className="card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <h5 className="card-title fw-bold mb-4">
+                                                <i className="bi bi-book me-2 text-primary"></i>Especialidades de Tutoría
+                                            </h5>
+                                            {materiasTutor.length > 0 ? (
+                                                <div className="d-flex flex-wrap gap-2">
+                                                    {materiasTutor.map((materia) => (
+                                                        <span key={materia.materia_id} className="badge bg-primary-subtle text-primary border border-primary-subtle p-2 px-3 rounded-pill">
+                                                            <i className="bi bi-check2-circle me-1"></i>{materia.nombre_materia}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-4">
+                                                    <i className="bi bi-exclamation-circle text-muted display-6"></i>
+                                                    <p className="text-muted mt-2">No has registrado materias para enseñar aún.</p>
+                                                    <button className="btn btn-primary btn-sm rounded-pill">Configurar materias</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="card border-0 shadow-sm bg-primary text-white">
+                                        <div className="card-body p-4 text-center">
+                                            <i className="bi bi-mortarboard display-4 mb-3"></i>
+                                            <h5 className="fw-bold">¿Listo para aprender algo nuevo?</h5>
+                                            <p className="small opacity-75">Explora los tutores disponibles y agenda tu primera sesión hoy mismo.</p>
+                                            <button className="btn btn-light text-primary fw-bold rounded-pill px-4">Buscar Tutor</button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
