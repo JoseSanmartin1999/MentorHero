@@ -1,6 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+
+// 1. IMPORTAR ESTILOS GLOBALES
+// Bootstrap CSS para la estructura y componentes
+import 'bootstrap/dist/css/bootstrap.min.css';
+// Bootstrap Icons para que las estrellas y cámaras se vean correctamente
+import 'bootstrap-icons/font/bootstrap-icons.css';
+// Tus estilos personalizados
 import './index.css';
+
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 

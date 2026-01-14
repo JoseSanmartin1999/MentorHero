@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-// URL de la API para buscar tutores
+// Configuración de URLs y recursos
 const TUTORS_API_URL = 'http://localhost:5000/api/users/tutors'; 
 const DEFAULT_AVATAR = 'https://res.cloudinary.com/dfuk35w6v/image/upload/v1700000000/default-avatar.png'; 
 
@@ -35,7 +35,7 @@ const SearchTutorPage = () => {
 
                 if (response.ok) {
                     const data = await response.json();
-                    // Nos aseguramos de recibir data.tutors y que sea un array
+                    // El backend devuelve { tutors: [...] }
                     setTutors(data.tutors || []);
                 } else {
                     const errorData = await response.json();
@@ -56,84 +56,118 @@ const SearchTutorPage = () => {
         fetchTutors();
     }, [navigate]);
 
+    // ✨ Función para renderizar estrellas según la reputación real
+    const renderStars = (rating) => {
+        const numericRating = parseFloat(rating) || 0;
+        return (
+            <div className="mb-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                    <i
+                        key={star}
+                        className={`bi bi-star-fill ${star <= Math.round(numericRating) ? 'text-warning' : 'text-muted opacity-25'}`}
+                        style={{ fontSize: '0.9rem', marginRight: '2px' }}
+                    ></i>
+                ))}
+                <span className="ms-1 small text-muted">({numericRating.toFixed(1)})</span>
+            </div>
+        );
+    };
+
     if (loading) {
         return (
-            <div className="text-center my-5">
-                <div className="spinner-border text-success" role="status"></div>
-                <p className="mt-2">Cargando tutores disponibles...</p>
+            <div className="d-flex flex-column justify-content-center align-items-center vh-100">
+                <div className="spinner-border text-success" style={{ width: '3rem', height: '3rem' }} role="status"></div>
+                <p className="mt-3 fw-bold text-success">Buscando mentores disponibles...</p>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="container my-5">
-                <div className="alert alert-danger text-center shadow-sm">{error}</div>
-                <div className="text-center">
-                    <button className="btn btn-primary" onClick={() => window.location.reload()}>Reintentar</button>
+            <div className="container my-5 text-center">
+                <div className="alert alert-danger shadow-sm py-4">
+                    <i className="bi bi-exclamation-triangle-fill fs-1 d-block mb-2"></i>
+                    {error}
                 </div>
+                <button className="btn btn-primary rounded-pill px-4" onClick={() => window.location.reload()}>
+                    Reintentar conexión
+                </button>
             </div>
         );
     }
 
     return (
         <div className="container my-5">
-            <h1 className="text-center mb-5" style={{ color: '#1a4731', fontWeight: 'bold' }}>
-                📚 Encuentra a tu Mentor
-            </h1>
-            
+            <header className="text-center mb-5">
+                <h1 className="display-4 fw-bold" style={{ color: '#1a4731' }}>
+                    📚 Encuentra a tu Mentor
+                </h1>
+                <p className="lead text-muted">Aprende de los mejores estudiantes de la comunidad</p>
+            </header>
+
             {tutors.length === 0 ? (
-                <div className="alert alert-warning text-center shadow-sm">
-                    No hay tutores disponibles registrados en este momento.
+                <div className="alert alert-light border text-center p-5 shadow-sm">
+                    <i className="bi bi-people fs-1 text-muted opacity-50 mb-3 d-block"></i>
+                    <h4>No hay tutores disponibles en este momento.</h4>
+                    <p className="mb-0 text-muted">Intenta regresar más tarde.</p>
                 </div>
             ) : (
                 <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
                     {tutors.map(tutor => (
                         <div className="col" key={tutor.id}>
-                            <div className="card h-100 shadow-sm border-0 transition-hover">
+                            <div className="card h-100 shadow-sm border-0 rounded-4 overflow-hidden card-hover">
                                 <div className="card-body text-center p-4">
-                                    {/* Foto de Perfil */}
-                                    <img 
-                                        src={tutor.foto_perfil_url || DEFAULT_AVATAR} 
-                                        alt={tutor.nombre} 
-                                        className="rounded-circle mb-3 shadow-sm border border-3 border-light"
-                                        style={{ width: '120px', height: '120px', objectFit: 'cover' }}
-                                    />
+                                    {/* Imagen de Perfil de Cloudinary */}
+                                    <div className="position-relative mb-4">
+                                        <img 
+                                            src={tutor.foto_perfil_url || DEFAULT_AVATAR} 
+                                            alt={tutor.nombre} 
+                                            className="rounded-circle shadow-sm border border-4 border-white"
+                                            style={{ width: '130px', height: '130px', objectFit: 'cover' }}
+                                        />
+                                    </div>
                                     
-                                    {/* Información Básica */}
+                                    {/* Información Principal */}
                                     <h5 className="card-title mb-1 fw-bold text-dark">{tutor.nombre}</h5>
-                                    <p className="text-muted small mb-2">@{tutor.username}</p>
-                                    <p className="badge bg-light text-dark border mb-3">{tutor.nombre_carrera}</p>
+                                    <p className="text-muted small mb-1">@{tutor.username}</p>
                                     
-                                    {/* Sección de Materias con validación defensiva */}
-                                    <h6 className="text-success mb-2 fw-bold" style={{ fontSize: '0.9rem' }}>Especialidades:</h6>
-                                    <div className="mb-4" style={{ minHeight: '60px' }}>
+                                    {/* Reputación en Estrellas */}
+                                    {renderStars(tutor.promedio_reputacion)}
+
+                                    <div className="d-flex justify-content-center gap-2 mb-3">
+                                        <span className="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill">
+                                            {tutor.nombre_carrera}
+                                        </span>
+                                        <span className="badge bg-light text-dark border px-3 py-2 rounded-pill">
+                                            {tutor.semestre}° Semestre
+                                        </span>
+                                    </div>
+                                    
+                                    {/* Especialidades */}
+                                    <h6 className="text-uppercase small fw-bold text-muted mb-2 ls-1">Especialidades</h6>
+                                    <div className="mb-4 d-flex flex-wrap justify-content-center gap-1" style={{ minHeight: '50px' }}>
                                         {tutor.materias && tutor.materias.length > 0 ? (
-                                            <div className="d-flex flex-wrap justify-content-center gap-1">
-                                                {tutor.materias.slice(0, 3).map((materia, i) => (
-                                                    <span key={i} className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1">
-                                                        {materia.nombre_materia}
-                                                    </span>
-                                                ))}
-                                                {tutor.materias.length > 3 && (
-                                                    <span className="badge bg-light text-muted border px-2 py-1">
-                                                        +{tutor.materias.length - 3} más
-                                                    </span>
-                                                )}
-                                            </div>
+                                            tutor.materias.slice(0, 3).map((materia, i) => (
+                                                <span key={i} className="badge bg-white text-dark border px-2 py-1 small fw-normal">
+                                                    {materia.nombre_materia}
+                                                </span>
+                                            ))
                                         ) : (
-                                            <p className="text-muted small italic">Consultar materias en el perfil</p>
+                                            <span className="text-muted small fst-italic">Ver materias en perfil</span>
+                                        )}
+                                        {tutor.materias?.length > 3 && (
+                                            <span className="text-muted small">+{tutor.materias.length - 3}</span>
                                         )}
                                     </div>
 
-                                    {/* Botón Revisar Perfil */}
+                                    {/* Botón de Acción */}
                                     <div className="d-grid">
                                         <Link 
                                             to={`/profile/${tutor.id}`} 
-                                            className="btn btn-success py-2 shadow-sm"
-                                            style={{ backgroundColor: '#2d572c', borderColor: '#2d572c' }}
+                                            className="btn btn-success py-2 fw-bold rounded-pill shadow-sm"
+                                            style={{ backgroundColor: '#1a4731', border: 'none' }}
                                         >
-                                            Ver Perfil Detallado
+                                            Ver Perfil Completo
                                         </Link>
                                     </div>
                                 </div>
@@ -142,6 +176,13 @@ const SearchTutorPage = () => {
                     ))}
                 </div>
             )}
+
+            {/* CSS para el efecto hover */}
+            <style>{`
+                .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+                .card-hover:hover { transform: translateY(-10px); box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important; }
+                .ls-1 { letter-spacing: 1px; }
+            `}</style>
         </div>
     );
 };

@@ -1,6 +1,8 @@
 const { pool } = require('../db');
 
-// 1. Crear solicitud (Para el Aprendiz)
+/**
+ * 1. CREAR SOLICITUD (Para el Aprendiz)
+ */
 const crearSolicitud = async (req, res) => {
     const aprendiz_id = req.user.id; 
     const { tutor_id, materia_id, temas, fecha, hora, tiempo } = req.body;
@@ -20,7 +22,7 @@ const crearSolicitud = async (req, res) => {
             [aprendiz_id, tutor_id, materia_id, temas, fecha, hora, tiempoNum]
         );
 
-        res.status(201).json({ message: 'Tutoria Solicitada con éxito.' });
+        res.status(201).json({ message: 'Tutoría solicitada con éxito.' });
     } catch (error) {
         console.error('❌ Error en crearSolicitud:', error.message);
         res.status(500).json({ message: 'Error interno al procesar la solicitud.' });
@@ -29,7 +31,9 @@ const crearSolicitud = async (req, res) => {
     }
 };
 
-// 2. Obtener solicitudes del Tutor (Bandeja de Entrada)
+/**
+ * 2. OBTENER SOLICITUDES DEL TUTOR (Bandeja de Entrada)
+ */
 const getSolicitudesTutor = async (req, res) => {
     const tutor_id = req.user.id;
     let connection;
@@ -37,15 +41,15 @@ const getSolicitudesTutor = async (req, res) => {
         connection = await pool.getConnection();
         const [rows] = await connection.execute(
             `SELECT 
-                s.solicitud_id, s.temas, s.fecha_tutoria, s.hora_tutoria, 
+                s.solicitud_id, s.aprendiz_id, s.temas, s.fecha_tutoria, s.hora_tutoria, 
                 s.tiempo_requerido, s.status, s.mensaje_tutor, s.created_at,
                 u.nombre AS nombre_aprendiz,
                 m.nombre_materia
              FROM solicitudes_tutoria s
              JOIN users u ON s.aprendiz_id = u.user_id
              JOIN materias m ON s.materia_id = m.materia_id
-             WHERE s.tutor_id = ?
-             ORDER BY s.created_at ASC`, // FIFO: Primero en entrar, primero en salir
+             WHERE s.tutor_id = ? AND s.status IN ('pendiente', 'aceptada')
+             ORDER BY s.created_at ASC`, 
             [tutor_id]
         );
         res.json(rows);
@@ -57,22 +61,22 @@ const getSolicitudesTutor = async (req, res) => {
     }
 };
 
-// 3. Actualizar estado y Mensaje (Solo el Tutor dueño)
+/**
+ * 3. ACTUALIZAR ESTADO (Aceptar/Rechazar)
+ */
 const actualizarStatus = async (req, res) => {
     const { id } = req.params;
     const { status, mensaje_tutor } = req.body; 
     const tutor_id = req.user.id;
 
-    // Validación de estados permitidos
-    const estadosValidos = ['aceptada', 'rechazada', 'finalizada', 'cancelada'];
+    const estadosValidos = ['aceptada', 'rechazada', 'cancelada'];
     if (!estadosValidos.includes(status)) {
-        return res.status(400).json({ message: 'Estado no válido.' });
+        return res.status(400).json({ message: 'Estado no válido para esta acción.' });
     }
 
     let connection;
     try {
         connection = await pool.getConnection();
-        
         const [result] = await connection.execute(
             `UPDATE solicitudes_tutoria 
              SET status = ?, mensaje_tutor = ? 
@@ -84,7 +88,7 @@ const actualizarStatus = async (req, res) => {
             return res.status(403).json({ message: 'No tienes permiso o la solicitud no existe.' });
         }
 
-        res.json({ message: `Solicitud actualizada a ${status} correctamente.` });
+        res.json({ message: `Solicitud marcada como ${status}.` });
     } catch (error) {
         console.error('❌ Error en actualizarStatus:', error.message);
         res.status(500).json({ message: 'Error al actualizar el estado.' });
@@ -93,7 +97,49 @@ const actualizarStatus = async (req, res) => {
     }
 };
 
-// 4. Obtener solicitudes enviadas por el Aprendiz
+/**
+ * 4. FINALIZAR Y CALIFICAR ALUMNO
+ */
+const finalizarYCalificar = async (req, res) => {
+    const tutor_id = req.user.id;
+    const { solicitud_id, alumno_id, estrellas, resultado, comentario } = req.body;
+
+    if (!solicitud_id || !alumno_id || !estrellas || !resultado) {
+        return res.status(400).json({ message: 'Faltan datos obligatorios para calificar.' });
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        await connection.execute(
+            `INSERT INTO calificaciones_alumnos 
+            (solicitud_id, tutor_id, alumno_id, estrellas, resultado, comentario) 
+            VALUES (?, ?, ?, ?, ?, ?)`,
+            [solicitud_id, tutor_id, alumno_id, estrellas, resultado, comentario || null]
+        );
+
+        await connection.execute(
+            `UPDATE solicitudes_tutoria SET status = 'finalizada' 
+             WHERE solicitud_id = ? AND tutor_id = ?`,
+            [solicitud_id, tutor_id]
+        );
+
+        await connection.commit();
+        res.json({ message: 'Tutoría finalizada y calificada correctamente.' });
+    } catch (error) {
+        if (connection) await connection.rollback();
+        console.error('❌ Error en finalizarYCalificar:', error.message);
+        res.status(500).json({ message: 'Error al finalizar la tutoría.' });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+/**
+ * 5. OBTENER SOLICITUDES DEL APRENDIZ
+ */
 const getSolicitudesAprendiz = async (req, res) => {
     const aprendiz_id = req.user.id;
     let connection;
@@ -101,8 +147,9 @@ const getSolicitudesAprendiz = async (req, res) => {
         connection = await pool.getConnection();
         const [rows] = await connection.execute(
             `SELECT 
-                s.solicitud_id, s.temas, s.fecha_tutoria, s.hora_tutoria, 
+                s.solicitud_id, s.tutor_id, s.temas, s.fecha_tutoria, s.hora_tutoria, 
                 s.tiempo_requerido, s.status, s.mensaje_tutor, s.created_at,
+                s.calificada_por_aprendiz, -- 👈 AGREGADO: Necesario para el banner del frontend
                 u.nombre AS nombre_tutor,
                 m.nombre_materia
              FROM solicitudes_tutoria s
@@ -120,5 +167,42 @@ const getSolicitudesAprendiz = async (req, res) => {
     }
 };
 
-// No olvides actualizar el module.exports al final del archivo:
-module.exports = { crearSolicitud, getSolicitudesTutor, actualizarStatus, getSolicitudesAprendiz };
+/**
+ * 6. CALIFICAR AL TUTOR
+ */
+const calificarTutor = async (req, res) => {
+    const aprendiz_id = req.user.id;
+    const { solicitud_id, tutor_id, estrellas, comentario } = req.body;
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.execute(
+            `INSERT INTO calificaciones_tutores 
+            (solicitud_id, aprendiz_id, tutor_id, estrellas, comentario) 
+            VALUES (?, ?, ?, ?, ?)`,
+            [solicitud_id, aprendiz_id, tutor_id, estrellas, comentario || null]
+        );
+
+        await connection.execute(
+            `UPDATE solicitudes_tutoria SET calificada_por_aprendiz = 1 
+             WHERE solicitud_id = ?`, [solicitud_id]
+        );
+
+        res.json({ message: 'Gracias por calificar a tu tutor.' });
+    } catch (error) {
+        console.error('❌ Error en calificarTutor:', error);
+        res.status(500).json({ message: 'Error al procesar la calificación.' });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+module.exports = { 
+    crearSolicitud, 
+    getSolicitudesTutor, 
+    actualizarStatus, 
+    getSolicitudesAprendiz,
+    finalizarYCalificar,
+    calificarTutor 
+};
