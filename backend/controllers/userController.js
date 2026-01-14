@@ -32,6 +32,7 @@ const getUserProfile = async (req, res) => {
         let promedio = 0;
 
         if (userData.rol === 'Tutor') {
+            // CORRECCIÓN: Se agrega m.materia_id para que el Frontend tenga la "key"
             const [subjects] = await connection.execute(
                 `SELECT m.materia_id, m.nombre_materia 
                  FROM tutor_materias tm
@@ -92,7 +93,7 @@ const getUserProfile = async (req, res) => {
 };
 
 /**
- * 2. ACTUALIZAR PERFIL (Se mantiene igual)
+ * 2. ACTUALIZAR PERFIL
  */
 const updateProfile = async (req, res) => {
     const userId = req.user.id;
@@ -123,14 +124,12 @@ const updateProfile = async (req, res) => {
 };
 
 /**
- * 3. OBTENER LISTA DE TUTORES DISPONIBLES (Corregido para evitar Error 500)
+ * 3. OBTENER LISTA DE TUTORES DISPONIBLES
  */
 const getAvailableTutors = async (req, res) => {
     let connection;
     try {
         connection = await pool.getConnection();
-        
-        // 1. Obtenemos los tutores con su promedio, agrupando correctamente
         const [tutors] = await connection.execute(
             `SELECT 
                 u.user_id AS id, u.nombre, u.username, u.foto_perfil_url, 
@@ -140,13 +139,13 @@ const getAvailableTutors = async (req, res) => {
              LEFT JOIN carreras c ON u.carrera_id = c.carrera_id
              LEFT JOIN calificaciones_tutores r ON u.user_id = r.tutor_id
              WHERE u.rol = 'Tutor'
-             GROUP BY u.user_id, c.nombre_carrera` // Agregamos c.nombre_carrera aquí para cumplir con ONLY_FULL_GROUP_BY
+             GROUP BY u.user_id, c.nombre_carrera`
         );
 
-        // 2. Buscamos las materias para cada tutor
         const tutorsWithMaterias = await Promise.all(tutors.map(async (tutor) => {
+            // CORRECCIÓN: Se agrega m.materia_id aquí también
             const [subjects] = await connection.execute(
-                `SELECT m.nombre_materia 
+                `SELECT m.materia_id, m.nombre_materia 
                  FROM tutor_materias tm
                  JOIN materias m ON tm.materia_id = m.materia_id
                  WHERE tm.tutor_id = ?`,
@@ -167,6 +166,7 @@ const getAvailableTutors = async (req, res) => {
         if (connection) connection.release();
     }
 };
+
 /**
  * 4. OBTENER DETALLE DE UN TUTOR POR ID
  */
@@ -176,7 +176,6 @@ const getTutorById = async (req, res) => {
     try {
         connection = await pool.getConnection();
         
-        // 1. Datos básicos del tutor
         const [users] = await connection.execute(
             `SELECT u.user_id, u.nombre, u.username, u.foto_perfil_url, u.semestre, u.institucion,
                     c.nombre_carrera, IFNULL(AVG(r.estrellas), 0) as promedio
@@ -189,15 +188,14 @@ const getTutorById = async (req, res) => {
 
         if (users.length === 0) return res.status(404).json({ message: 'Tutor no encontrado' });
 
-        // 2. OBTENER MATERIAS (Esto es lo que te falta)
+        // CORRECCIÓN: Se agrega m.materia_id para que el Frontend funcione
         const [subjects] = await connection.execute(
-            `SELECT m.nombre_materia 
+            `SELECT m.materia_id, m.nombre_materia 
              FROM tutor_materias tm
              JOIN materias m ON tm.materia_id = m.materia_id
              WHERE tm.tutor_id = ?`, [id]
         );
 
-        // 3. OBTENER RESEÑAS (Esto es lo que te falta)
         const [comments] = await connection.execute(
             `SELECT r.estrellas, r.comentario, u.nombre as autor, r.fecha
              FROM calificaciones_tutores r
@@ -209,13 +207,13 @@ const getTutorById = async (req, res) => {
         res.json({
             tutor: {
                 ...users[0],
-                materias: subjects, // El frontend busca "materias"
-                reviews: comments,  // El frontend busca "reviews"
+                materias: subjects,
+                reviews: comments,
                 reputacion: users[0].promedio
             }
         });
     } catch (error) {
-        console.error(error);
+        console.error("❌ Error en getTutorById:", error.message);
         res.status(500).json({ message: 'Error interno' });
     } finally {
         if (connection) connection.release();

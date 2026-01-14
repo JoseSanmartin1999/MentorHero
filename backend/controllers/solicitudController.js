@@ -2,29 +2,59 @@ const { pool } = require('../db');
 
 /**
  * 1. CREAR SOLICITUD (Para el Aprendiz)
+ * Mejorado con validación de "Auto-tutoría" y fechas pasadas.
  */
 const crearSolicitud = async (req, res) => {
     const aprendiz_id = req.user.id; 
     const { tutor_id, materia_id, temas, fecha, hora, tiempo } = req.body;
 
+    // --- VALIDACIONES DE SEGURIDAD ---
+    const materiaIdNum = parseInt(materia_id);
+    const tutorIdNum = parseInt(tutor_id);
     const tiempoNum = parseInt(tiempo);
+
+    // Evitar que un usuario sea su propio tutor
+    if (aprendiz_id === tutorIdNum) {
+        return res.status(400).json({ message: 'No puedes solicitarte una tutoría a ti mismo.' });
+    }
+
+    // Validar que la fecha no sea en el pasado
+    const fechaSolicitada = new Date(fecha);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0); // Solo comparar fechas, no horas
+    if (fechaSolicitada < hoy) {
+        return res.status(400).json({ message: 'La fecha de la tutoría no puede ser en el pasado.' });
+    }
+
+    if (!materiaIdNum || isNaN(materiaIdNum)) {
+        return res.status(400).json({ message: 'Debe seleccionar una materia válida.' });
+    }
+
     if (isNaN(tiempoNum) || tiempoNum < 60 || tiempoNum > 120) {
-        return res.status(400).json({ message: 'El tiempo debe ser un número entre 60 y 120 minutos.' });
+        return res.status(400).json({ message: 'El tiempo debe ser entre 60 y 120 minutos.' });
+    }
+
+    if (!temas || temas.trim() === "") {
+        return res.status(400).json({ message: 'Debe especificar los temas a tratar.' });
     }
 
     let connection;
     try {
         connection = await pool.getConnection();
+        
         await connection.execute(
             `INSERT INTO solicitudes_tutoria 
             (aprendiz_id, tutor_id, materia_id, temas, fecha_tutoria, hora_tutoria, tiempo_requerido) 
             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [aprendiz_id, tutor_id, materia_id, temas, fecha, hora, tiempoNum]
+            [aprendiz_id, tutorIdNum, materiaIdNum, temas.trim(), fecha, hora, tiempoNum]
         );
 
         res.status(201).json({ message: 'Tutoría solicitada con éxito.' });
     } catch (error) {
         console.error('❌ Error en crearSolicitud:', error.message);
+        if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+            return res.status(400).json({ message: 'La materia o el tutor seleccionados no son válidos.' });
+        }
         res.status(500).json({ message: 'Error interno al procesar la solicitud.' });
     } finally {
         if (connection) connection.release();
@@ -71,7 +101,7 @@ const actualizarStatus = async (req, res) => {
 
     const estadosValidos = ['aceptada', 'rechazada', 'cancelada'];
     if (!estadosValidos.includes(status)) {
-        return res.status(400).json({ message: 'Estado no válido para esta acción.' });
+        return res.status(400).json({ message: 'Estado no válido.' });
     }
 
     let connection;
@@ -149,7 +179,7 @@ const getSolicitudesAprendiz = async (req, res) => {
             `SELECT 
                 s.solicitud_id, s.tutor_id, s.temas, s.fecha_tutoria, s.hora_tutoria, 
                 s.tiempo_requerido, s.status, s.mensaje_tutor, s.created_at,
-                s.calificada_por_aprendiz, -- 👈 AGREGADO: Necesario para el banner del frontend
+                s.calificada_por_aprendiz,
                 u.nombre AS nombre_tutor,
                 m.nombre_materia
              FROM solicitudes_tutoria s

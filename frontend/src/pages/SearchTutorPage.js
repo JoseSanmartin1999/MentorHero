@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-// Configuración de URLs y recursos
 const TUTORS_API_URL = 'http://localhost:5000/api/users/tutors'; 
 const DEFAULT_AVATAR = 'https://res.cloudinary.com/dfuk35w6v/image/upload/v1700000000/default-avatar.png'; 
 
 const SearchTutorPage = () => {
     const [tutors, setTutors] = useState([]);
+    const [filteredTutors, setFilteredTutors] = useState([]); // Estado para los tutores filtrados
+    const [searchTerm, setSearchTerm] = useState(''); // Término de búsqueda
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const navigate = useNavigate();
@@ -35,8 +36,8 @@ const SearchTutorPage = () => {
 
                 if (response.ok) {
                     const data = await response.json();
-                    // El backend devuelve { tutors: [...] }
                     setTutors(data.tutors || []);
+                    setFilteredTutors(data.tutors || []); // Inicialmente mostramos todos
                 } else {
                     const errorData = await response.json();
                     if (response.status === 401) {
@@ -56,7 +57,25 @@ const SearchTutorPage = () => {
         fetchTutors();
     }, [navigate]);
 
-    // ✨ Función para renderizar estrellas según la reputación real
+    // 🔍 Lógica de filtrado en tiempo real
+    useEffect(() => {
+        const results = tutors.filter(tutor => {
+            const val = searchTerm.toLowerCase();
+            
+            // Criterio 1: Nombre
+            const matchesName = tutor.nombre.toLowerCase().includes(val);
+            
+            // Criterio 2: Materias (buscamos en el array de materias del tutor)
+            const matchesSubject = tutor.materias?.some(m => 
+                m.nombre_materia.toLowerCase().includes(val)
+            );
+
+            return matchesName || matchesSubject;
+        });
+
+        setFilteredTutors(results);
+    }, [searchTerm, tutors]);
+
     const renderStars = (rating) => {
         const numericRating = parseFloat(rating) || 0;
         return (
@@ -73,28 +92,12 @@ const SearchTutorPage = () => {
         );
     };
 
-    if (loading) {
-        return (
-            <div className="d-flex flex-column justify-content-center align-items-center vh-100">
-                <div className="spinner-border text-success" style={{ width: '3rem', height: '3rem' }} role="status"></div>
-                <p className="mt-3 fw-bold text-success">Buscando mentores disponibles...</p>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="container my-5 text-center">
-                <div className="alert alert-danger shadow-sm py-4">
-                    <i className="bi bi-exclamation-triangle-fill fs-1 d-block mb-2"></i>
-                    {error}
-                </div>
-                <button className="btn btn-primary rounded-pill px-4" onClick={() => window.location.reload()}>
-                    Reintentar conexión
-                </button>
-            </div>
-        );
-    }
+    if (loading) return (
+        <div className="d-flex flex-column justify-content-center align-items-center vh-100">
+            <div className="spinner-border text-success" style={{ width: '3rem', height: '3rem' }} role="status"></div>
+            <p className="mt-3 fw-bold text-success">Buscando mentores disponibles...</p>
+        </div>
+    );
 
     return (
         <div className="container my-5">
@@ -103,21 +106,49 @@ const SearchTutorPage = () => {
                     📚 Encuentra a tu Mentor
                 </h1>
                 <p className="lead text-muted">Aprende de los mejores estudiantes de la comunidad</p>
+                
+                {/* 🔎 BARRA DE BÚSQUEDA */}
+                <div className="row justify-content-center mt-4">
+                    <div className="col-md-8 col-lg-6">
+                        <div className="input-group input-group-lg shadow-sm">
+                            <span className="input-group-text bg-white border-end-0">
+                                <i className="bi bi-search text-success"></i>
+                            </span>
+                            <input 
+                                type="text" 
+                                className="form-control border-start-0" 
+                                placeholder="Busca por nombre o materia (ej: Cálculo, Java...)" 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            {searchTerm && (
+                                <button 
+                                    className="btn btn-outline-secondary bg-white border-start-0" 
+                                    onClick={() => setSearchTerm('')}
+                                >
+                                    <i className="bi bi-x-lg"></i>
+                                </button>
+                            )}
+                        </div>
+                        <div className="mt-2 small text-muted text-start ps-2">
+                            Se muestran {filteredTutors.length} de {tutors.length} tutores
+                        </div>
+                    </div>
+                </div>
             </header>
 
-            {tutors.length === 0 ? (
+            {filteredTutors.length === 0 ? (
                 <div className="alert alert-light border text-center p-5 shadow-sm">
-                    <i className="bi bi-people fs-1 text-muted opacity-50 mb-3 d-block"></i>
-                    <h4>No hay tutores disponibles en este momento.</h4>
-                    <p className="mb-0 text-muted">Intenta regresar más tarde.</p>
+                    <i className="bi bi-search fs-1 text-muted opacity-50 mb-3 d-block"></i>
+                    <h4>No encontramos resultados para "{searchTerm}"</h4>
+                    <p className="mb-0 text-muted">Intenta buscar con otra palabra clave o materia.</p>
                 </div>
             ) : (
                 <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-                    {tutors.map(tutor => (
+                    {filteredTutors.map(tutor => (
                         <div className="col" key={tutor.id}>
                             <div className="card h-100 shadow-sm border-0 rounded-4 overflow-hidden card-hover">
                                 <div className="card-body text-center p-4">
-                                    {/* Imagen de Perfil de Cloudinary */}
                                     <div className="position-relative mb-4">
                                         <img 
                                             src={tutor.foto_perfil_url || DEFAULT_AVATAR} 
@@ -127,11 +158,9 @@ const SearchTutorPage = () => {
                                         />
                                     </div>
                                     
-                                    {/* Información Principal */}
                                     <h5 className="card-title mb-1 fw-bold text-dark">{tutor.nombre}</h5>
                                     <p className="text-muted small mb-1">@{tutor.username}</p>
                                     
-                                    {/* Reputación en Estrellas */}
                                     {renderStars(tutor.promedio_reputacion)}
 
                                     <div className="d-flex justify-content-center gap-2 mb-3">
@@ -143,24 +172,23 @@ const SearchTutorPage = () => {
                                         </span>
                                     </div>
                                     
-                                    {/* Especialidades */}
                                     <h6 className="text-uppercase small fw-bold text-muted mb-2 ls-1">Especialidades</h6>
                                     <div className="mb-4 d-flex flex-wrap justify-content-center gap-1" style={{ minHeight: '50px' }}>
                                         {tutor.materias && tutor.materias.length > 0 ? (
-                                            tutor.materias.slice(0, 3).map((materia, i) => (
-                                                <span key={i} className="badge bg-white text-dark border px-2 py-1 small fw-normal">
+                                            tutor.materias.map((materia, i) => (
+                                                <span key={i} className={`badge border px-2 py-1 small fw-normal ${
+                                                    searchTerm && materia.nombre_materia.toLowerCase().includes(searchTerm.toLowerCase())
+                                                    ? "bg-success text-white border-success shadow-sm" // Resaltar materia si coincide con búsqueda
+                                                    : "bg-white text-dark"
+                                                }`}>
                                                     {materia.nombre_materia}
                                                 </span>
                                             ))
                                         ) : (
                                             <span className="text-muted small fst-italic">Ver materias en perfil</span>
                                         )}
-                                        {tutor.materias?.length > 3 && (
-                                            <span className="text-muted small">+{tutor.materias.length - 3}</span>
-                                        )}
                                     </div>
 
-                                    {/* Botón de Acción */}
                                     <div className="d-grid">
                                         <Link 
                                             to={`/profile/${tutor.id}`} 
@@ -177,11 +205,11 @@ const SearchTutorPage = () => {
                 </div>
             )}
 
-            {/* CSS para el efecto hover */}
             <style>{`
                 .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
                 .card-hover:hover { transform: translateY(-10px); box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important; }
                 .ls-1 { letter-spacing: 1px; }
+                .input-group:focus-within { border-color: #1a4731; outline: 0; box-shadow: 0 0 0 0.25rem rgba(26, 71, 49, 0.25); }
             `}</style>
         </div>
     );
